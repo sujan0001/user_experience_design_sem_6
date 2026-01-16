@@ -169,12 +169,12 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Home, 
-  FolderOpen, 
-  FileText, 
-  TrendingUp, 
-  BookOpen, 
+import {
+  Home,
+  FolderOpen,
+  FileText,
+  TrendingUp,
+  BookOpen,
   Settings,
   Search,
   ChevronRight,
@@ -188,7 +188,7 @@ import {
   PieChart,
   BookMarked,
   Layers,
-  List
+  List,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -205,11 +205,8 @@ export default function Sidebar() {
 
   const toggleMenu = (menuKey: string) => {
     setExpandedMenus((prev) => {
-      // Close all other menus and toggle the clicked one
       const newState: Record<string, boolean> = {};
-      Object.keys(prev).forEach(key => {
-        newState[key] = false;
-      });
+      Object.keys(prev).forEach((key) => (newState[key] = false));
       newState[menuKey] = !prev[menuKey];
       return newState;
     });
@@ -264,204 +261,152 @@ export default function Sidebar() {
     },
   ];
 
-  const isPathActive = (path?: string): boolean => {
+  const getMenuKey = (label: string) =>
+    label.toLowerCase().replace(/\s+/g, '-');
+
+  const isPathActive = (path?: string) => {
     if (!path) return false;
     const basePath = path.split('?')[0];
-    const currentPath = location.pathname;
-    
-    if (basePath === currentPath) return true;
-    return currentPath.startsWith(basePath + '/');
+    return location.pathname === basePath || location.pathname.startsWith(basePath + '/');
   };
 
-  const getMenuKey = (label: string): string => {
-    return label.toLowerCase().replace(/\s+/g, '-');
-  };
-
-  // Search and filter logic
   const { filteredItems, highlightedPaths } = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    
-    if (!query) {
-      return { filteredItems: menuItems, highlightedPaths: new Set<string>() };
-    }
+    if (!query) return { filteredItems: menuItems, highlightedPaths: new Set<string>() };
 
     const highlighted = new Set<string>();
-    const filtered = menuItems.map(item => {
-      // Check if parent matches
-      const parentMatches = item.label.toLowerCase().includes(query);
-      
-      if (parentMatches) {
-        highlighted.add(getMenuKey(item.label));
-      }
 
-      // Check children
-      if (item.children) {
-        const matchingChildren = item.children.filter(child => 
-          child.label.toLowerCase().includes(query)
-        );
-        
-        if (matchingChildren.length > 0) {
-          highlighted.add(getMenuKey(item.label));
-          matchingChildren.forEach(child => {
-            if (child.path) highlighted.add(child.path);
-          });
-          
-          return { ...item, children: matchingChildren };
+    const filtered = menuItems
+      .map((item) => {
+        const parentMatch = item.label.toLowerCase().includes(query);
+        if (parentMatch) highlighted.add(getMenuKey(item.label));
+
+        if (item.children) {
+          const children = item.children.filter((c) =>
+            c.label.toLowerCase().includes(query)
+          );
+          if (children.length) {
+            highlighted.add(getMenuKey(item.label));
+            children.forEach((c) => c.path && highlighted.add(c.path));
+            return { ...item, children };
+          }
         }
-      }
 
-      // Return item if parent matches or if it has no children and matches
-      if (parentMatches || !item.children) {
-        return item;
-      }
-
-      return null;
-    }).filter(Boolean) as MenuItem[];
+        return parentMatch || !item.children ? item : null;
+      })
+      .filter(Boolean) as MenuItem[];
 
     return { filteredItems: filtered, highlightedPaths: highlighted };
   }, [searchQuery]);
 
-  // Auto-expand menus when searching
   useEffect(() => {
     if (searchQuery.trim()) {
-      const newExpanded: Record<string, boolean> = {};
-      filteredItems.forEach(item => {
-        if (item.children && item.children.length > 0) {
-          newExpanded[getMenuKey(item.label)] = true;
-        }
+      const expanded: Record<string, boolean> = {};
+      filteredItems.forEach((item) => {
+        if (item.children) expanded[getMenuKey(item.label)] = true;
       });
-      setExpandedMenus(newExpanded);
+      setExpandedMenus(expanded);
     }
   }, [searchQuery, filteredItems]);
 
-  // Auto-expand menu containing active item on mount
   useEffect(() => {
     if (!searchQuery) {
-      menuItems.forEach(item => {
-        if (item.children) {
-          const hasActiveChild = item.children.some(child => isPathActive(child.path));
-          if (hasActiveChild) {
-            setExpandedMenus(prev => ({
-              ...prev,
-              [getMenuKey(item.label)]: true
-            }));
-          }
+      menuItems.forEach((item) => {
+        if (item.children?.some((c) => isPathActive(c.path))) {
+          setExpandedMenus((prev) => ({
+            ...prev,
+            [getMenuKey(item.label)]: true,
+          }));
         }
       });
     }
   }, [location.pathname, searchQuery]);
 
-  const isHighlighted = (key: string): boolean => {
-    return highlightedPaths.has(key);
-  };
-
   return (
     <aside className="fixed left-0 top-16 bottom-0 w-64 bg-white border-r border-gray-200 z-40 overflow-y-auto">
       <div className="p-4">
-        {/* Search Bar */}
+        {/* Search */}
         <div className="mb-4 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
-            type="text"
-            placeholder="Search Menu"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            placeholder="Search Menu"
+            className="w-full pl-10 pr-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
           />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         </div>
 
-        {/* Menu Items */}
-        <nav>
-          <ul className="space-y-1">
-            {filteredItems.map((item) => {
-              if (item.children) {
-                const menuKey = getMenuKey(item.label);
-                const isExpanded = expandedMenus[menuKey] || false;
-                const hasActiveChild = item.children.some((child) => isPathActive(child.path));
-                const isMenuHighlighted = isHighlighted(menuKey);
-
-                return (
-                  <li key={item.label}>
-                    <button
-                      onClick={() => toggleMenu(menuKey)}
-                      className={`w-full flex items-center justify-between gap-3 px-4 py-2 rounded-lg transition-all ${
-                        hasActiveChild || isMenuHighlighted
-                          ? 'bg-blue-50 text-blue-600 ring-2 ring-blue-200'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <item.icon className="w-5 h-5" />
-                        <span className="font-medium">{item.label}</span>
-                      </div>
-                      <ChevronRight 
-                        className={`w-4 h-4 transition-transform duration-200 ${
-                          isExpanded ? 'rotate-90' : ''
-                        }`}
-                      />
-                    </button>
-                    {isExpanded && (
-                      <ul className="ml-8 mt-1 space-y-1">
-                        {item.children.map((child) => {
-                          const isActive = isPathActive(child.path);
-                          const isChildHighlighted = child.path && isHighlighted(child.path);
-                          const ChildIcon = child.icon;
-
-                          return (
-                            <li key={child.path}>
-                              <Link
-                                to={child.path || '#'}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all text-sm ${
-                                  isActive
-                                    ? 'bg-blue-100 text-blue-700 font-medium ring-2 ring-blue-200'
-                                    : isChildHighlighted
-                                    ? 'bg-blue-50 text-blue-600'
-                                    : 'text-gray-600 hover:bg-gray-50'
-                                }`}
-                              >
-                                {ChildIcon && <ChildIcon className="w-4 h-4" />}
-                                <span>{child.label}</span>
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </li>
-                );
-              }
-
-              const isActive = isPathActive(item.path);
-              const ItemIcon = item.icon;
-              const isItemHighlighted = isHighlighted(getMenuKey(item.label));
-
+        <ul className="space-y-1">
+          {filteredItems.map((item) => {
+            if (!item.children) {
+              const active = isPathActive(item.path);
               return (
                 <li key={item.path}>
                   <Link
-                    to={item.path || '#'}
-                    className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
-                      isActive
+                    to={item.path!}
+                    className={`flex items-center gap-3 px-4 py-2 rounded-lg transition ${
+                      active
                         ? 'bg-blue-50 text-blue-600 ring-2 ring-blue-200'
-                        : isItemHighlighted
-                        ? 'bg-blue-50 text-blue-600'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <ItemIcon className="w-5 h-5" />
-                    <span className="font-medium">{item.label}</span>
+                    <item.icon className="w-5 h-5" />
+                    {item.label}
                   </Link>
                 </li>
               );
-            })}
-          </ul>
-        </nav>
+            }
 
-        {/* No Results Message */}
-        {searchQuery && filteredItems.length === 0 && (
-          <div className="text-center text-gray-500 text-sm mt-8">
-            No menu items found
-          </div>
-        )}
+            const key = getMenuKey(item.label);
+            const expanded = expandedMenus[key];
+
+            return (
+              <li key={item.label}>
+                <button
+                  onClick={() => toggleMenu(key)}
+                  className="w-full flex items-center justify-between px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon className="w-5 h-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </div>
+                  <ChevronRight
+                    className={`w-4 h-4 transition-transform duration-300 ${
+                      expanded ? 'rotate-90' : ''
+                    }`}
+                  />
+                </button>
+
+                {/* ✅ Smooth submenu */}
+                <ul
+                  className={`
+                    ml-8 mt-1 space-y-1 overflow-hidden
+                    transition-all duration-300 ease-in-out
+                    ${expanded
+                      ? 'max-h-[500px] opacity-100 translate-y-0'
+                      : 'max-h-0 opacity-0 -translate-y-1'}
+                  `}
+                >
+                  {item.children.map((child) => (
+                    <li key={child.path}>
+                      <Link
+                        to={child.path!}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition ${
+                          isPathActive(child.path)
+                            ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-200'
+                            : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <child.icon className="w-4 h-4" />
+                        {child.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </aside>
   );
